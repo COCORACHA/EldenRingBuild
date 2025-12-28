@@ -17,12 +17,10 @@
             background-color: #1a1a1a;
             color: #e5e5e5;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            scroll-behavior: smooth;
         }
         .elden-gold {
             color: #d4b068;
-        }
-        .elden-border {
-            border-color: #555;
         }
         .card-bg {
             background-color: #262626;
@@ -47,9 +45,23 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useMemo } = React;
 
-        // 完整資料庫 (Base + DLC + Special)
+        // 全域配點軟上限邏輯函數
+        const getSoftCapText = (stat) => {
+            if (!stat) return null;
+            const caps = [];
+            if (stat.includes("力") || stat.includes("純力")) caps.push("力:單55/雙40");
+            if (stat.includes("敏") || stat.includes("靈巧") || stat.includes("純敏")) caps.push("敏:50");
+            if (stat.includes("智") || stat.includes("純智")) caps.push("智:80");
+            if (stat.includes("信") || stat.includes("純信")) caps.push("信:60");
+            if (stat.includes("感") || stat.includes("純感")) caps.push("感:45");
+            
+            if (caps.length === 0) return null;
+            return caps.join(" | ");
+        };
+
+        // 完整資料庫
         const allBuilds = [
             // 本體職業 1-75
             { cat: "本體職業", id: 1, name: "魔劍士", stat: "智/力", weapon: "大劍、學院輝石杖", shield: "-", armor: "卡利亞騎士頭、蒼銀身、黑刀手、黑刀腳", talisman: "斧護符、亞歷山大的碎片、染藍兇刀、矛護符", spell: "魔力武器", skill: "輝劍圓陣" },
@@ -63,135 +75,121 @@
             { cat: "本體職業", id: 9, name: "月光十字軍", stat: "純智", weapon: "暗月大劍、卡利亞權杖", shield: "-", armor: "巨盔、密使衣、羅傑爾手、羅傑爾腳", talisman: "亞歷山大的碎片、葛孚雷雕像、龍徽大盾護符、魔蠍護符", spell: "拉尼的暗月、巨劍陣、魔法之境、帚星", skill: "-" },
             { cat: "本體職業", id: 10, name: "殞星法師", stat: "純智", weapon: "卡利亞權杖、隕石杖、癲火聖印記", shield: "-", armor: "黑夜女巫頭、雪魔女套", talisman: "獻鬥劍護符、魔蠍護符、葛孚雷雕像、大魔法師球", spell: "碎星、重力球、岩石球、隕石、艾斯提隕石", skill: "旋轉" },
             { cat: "本體職業", id: 11, name: "星雲騎士", stat: "智/敏", weapon: "艾斯提薄翼、任意法杖", shield: "卡利亞騎士盾", armor: "巨盔、鱗片套", talisman: "魔蠍護符、染藍兇刀、亞歷山大的碎片、曲劍護符", spell: "魔力盾牌、魔法之境", skill: "-" },
-            { cat: "本體職業", id: 12, name: "黃金之劍", stat: "純信", weapon: "秘文劍、夜與火之直劍、黃金律法聖印記", shield: "藍金鳶形盾", armor: "金面具、百智套", talisman: "聖蠍護符、獻鬥劍護符、獻鬥盾護符、龍徽大盾護符", spell: "黃金樹立誓、黃金樹恩惠、光環、化聖光環、拉達岡的光環、艾爾登流星、糾死聖律", skill: "-" },
-            { cat: "本體職業", id: 13, name: "靈魂武士", stat: "智/敏", weapon: "長牙、學院輝石杖", shield: "-", armor: "黑刀套", talisman: "龍輝大盾護符、亞歷山大的碎片、魔蠍護符、米莉森的義手", spell: "巨劍陣、創星雨、化為無形、羅雷塔大弓、卡利亞式奉還、魔力武器、魔法之境、冰霧", skill: "二連斬" },
-            { cat: "本體職業", id: 14, name: "死術師", stat: "智/信", weapon: "夜與火之直劍、黃金律法聖印記、死亡子杖", shield: "-", armor: "菲雅套、羅傑爾手、羅傑爾腳", talisman: "魔蠍護符、大魔法師球、葛孚雷雕像、龍徽大盾護符", spell: "黃金樹立誓、火賜、召喚怨魂、古老死亡怨魂、迸發靈火、魔法之境、拉卡德怨魂", skill: "-" },
-            { cat: "本體職業", id: 15, name: "戰巫", stat: "純智", weapon: "卡利亞權杖、盧瑟特輝石杖、卡利亞輝石杖", shield: "卡利亞騎士盾", armor: "巨盔、聚獸套", talisman: "魔蠍護符、大魔法師球、龍徽大盾護符、拉達岡雕像", spell: "魔法之境、海摩大槌、羅雷塔大弓、卡利亞迅劍、卡利亞貫刺、亞杜拉月光劍", skill: "-" },
-            { cat: "本體職業", id: 16, name: "沉默喚矛師", stat: "敏/智", weapon: "死亡儀式矛、卡利亞權杖、喪失杖", shield: "-", armor: "盜賊面具、黑刀套", talisman: "亞歷山大的碎片、獻鬥劍護符、魔蠍護符、大山羊護符", spell: "化為無形、黑夜彗星、黑夜魔礫、魔法之境", skill: "-" },
-            { cat: "本體職業", id: 17, name: "鬼劍", stat: "敏/智", weapon: "死亡鈞棒、喪失杖", shield: "蠍紋鳶形盾", armor: "鮮血貴族頭、黑劍套", talisman: "亞歷山大的碎片、魔蠍護符、龍徽大盾護符、曲劍護符", spell: "魔法之境", skill: "-" },
-            { cat: "本體職業", id: 18, name: "卡利亞屠夫", stat: "力/智", weapon: "鐵柴刀、卡利亞權杖", shield: "水母盾", armor: "卡利亞騎士頭、身,失鄉騎士手、腳", talisman: "獻鬥劍護符、斧護符、魔蠍護符", spell: "巨劍陣", skill: "侍王騎士的決心" },
-            { cat: "本體職業", id: 19, name: "魔法盜賊", stat: "敏/智", weapon: "輝石克力士", shield: "卡利亞騎士盾", armor: "黑刀身、羅傑爾套", talisman: "魔蠍護符、葛孚雷肖像、獻鬥劍護符、亞歷山大的碎片", spell: "-", skill: "卡利亞式奉還" },
-            { cat: "本體職業", id: 20, name: "蒼藍之拳", stat: "力/智", weapon: "鐵球拳套、學院輝石杖", shield: "-", armor: "巨盔、筒形外衣、鱗片手、腳", talisman: "腐敗翼劍徽章、米莉森的義手、斧護符、龍徽大盾護符", spell: "魔力武器、寒冷武器", skill: "忍耐" },
-            { cat: "本體職業", id: 21, name: "秘紅雷霆", stat: "純信", weapon: "黃金樹聖印記、碎石聖印記", shield: "-", armor: "孿生套", talisman: "群聚信徒立誓布、雷蠍護符、獻鬥劍護符、龍徽大盾護符", spell: "黃金樹立誓、精準雷擊、雷電槍、蘭斯桑克斯的薙刀、冰雷槍、古龍雷擊、普拉頓桑克斯的雷霆", skill: "-" },
-            { cat: "本體職業", id: 22, name: "純正聖騎士", stat: "純信", weapon: "秘文劍、爪痕聖印記", shield: "聖樹大盾", armor: "巨盔、聖樹騎士套", talisman: "大山羊護符、亞歷山大的碎片、曲劍護符、聖蠍護符", spell: "黃金樹立誓、火賜、黃金樹恩惠", skill: "-" },
-            { cat: "本體職業", id: 23, name: "黃金十字軍", stat: "力/信", weapon: "石像鬼大劍、黃金樹聖印記", shield: "黃銅盾", armor: "巨盔、黃金筒形外衣、鎖子手、腳", talisman: "曲劍護符、群聚信徒立誓布、亞歷山大的碎片、聖蠍/火蠍護符", spell: "黃金樹立誓、黃金樹恩惠、艾爾登流星、雷電槍、黑劍、黃金槍、黑焰庇佑", skill: "劍舞" },
-            { cat: "本體職業", id: 24, name: "瀆神先鋒", stat: "信/力", weapon: "褻瀆聖劍、石像鬼黑劍、石像鬼大劍、爪痕聖印記", shield: "-", armor: "猛禽黑羽、大樹守衛套", talisman: "亞歷山大的碎片、大壺眾武護符、鉤爪護符、龍徽大盾護符", spell: "黃金樹立誓、黃金樹恩惠、火賜、雷電槍、黑焰、古蘭格岩石", skill: "炎擊/聖律" },
-            { cat: "本體職業", id: 25, name: "黑焰武士", stat: "敏/信", weapon: "十字薙刀、長牙、狩獵神祇聖印記", shield: "-", armor: "白面具、待殮套", talisman: "亞歷山大的碎片、拉達岡糜爛烙印、葛孚雷肖像、龍徽大盾護符", spell: "黃金樹立誓、黑焰、黑焰刀刃、血焰刀刃、橫掃黑焰、黑焰儀式、黑焰庇佑", skill: "幻影共擊/黑焰漩渦、劍舞/二連斬" },
-            { cat: "本體職業", id: 26, name: "黑刀刺客", stat: "敏/信", weapon: "黑刀、狩獵神祇聖印記", shield: "-", armor: "黑刀套", talisman: "亞歷山大的碎片、染藍兇刀、曲劍護符、龍徽大盾護符", spell: "黃金樹立誓、黃金樹恩惠、黑焰、黑焰刀刃、血焰刀刃", skill: "幻影共擊、劍舞" },
-            { cat: "本體職業", id: 27, name: "烈焰舞者", stat: "信/敏", weapon: "雙刀、指頭聖印記", shield: "-", armor: "火焰修士套", talisman: "亞歷山大的碎片、火蠍護符、拉達岡糜爛烙印、龍徽大盾護符", spell: "黃金樹立誓、黃金樹恩惠、火賜、火焰阿傾注吧、感受巨人火焰吧、惡神火焰、火焰阿、狂亂火球", skill: "劍舞、炎擊" },
-            { cat: "本體職業", id: 28, name: "黑劍", stat: "力/信", weapon: "瑪利喀斯的黑劍、爪痕聖印記", shield: "-", armor: "黑劍套", talisman: "龍徽大盾護符、亞歷山大的碎片、聖蠍護符、鉤爪護符", spell: "黃金樹立誓、黃金樹恩惠、黑劍", skill: "-" },
-            { cat: "本體職業", id: 29, name: "弒神者", stat: "敏/信", weapon: "狩獵神祇大劍、任意聖印記", shield: "-", armor: "大山羊頭、身,老將手、腳", talisman: "亞歷山大的碎片、卡利亞徽章、大山羊護符、龍徽大盾護符", spell: "黃金樹立誓、火焰啊賜予我力", skill: "-" },
-            { cat: "本體職業", id: 30, name: "劍之聖者", stat: "敏/信", weapon: "神軀化劍、滅洛斯劍、任意聖印記", shield: "-", armor: "聖樹騎士套", talisman: "亞歷山大的碎片、卡利亞徽章、鉤爪護符、聖蠍護符", spell: "黃金樹立誓、火焰啊賜予我力", skill: "-" },
-            { cat: "本體職業", id: 31, name: "火焰術士", stat: "純信", weapon: "黃金樹聖印記、巨人聖印記", shield: "-", armor: "調香師套", talisman: "葛孚雷肖像、火蠍護符、獻鬥劍護符或群聚信徒立誓布、龍徽大盾護符", spell: "黃金樹立誓、火焰啊賜予我力、火焰阿傾注吧、惡神火焰、火焰阿、感受巨人火焰吧", skill: "-" },
-            { cat: "本體職業", id: 32, name: "龍騎士", stat: "力/信", weapon: "土龍麟劍、爪痕聖印記", shield: "-", armor: "龍騎士套", talisman: "火蠍護符、亞歷山大的碎片、龍徽大盾護符、卡利亞徽章", spell: "黃金樹立誓、火焰啊賜予我力", skill: "-" },
-            { cat: "本體職業", id: 33, name: "熔爐騎士", stat: "力/信", weapon: "奧陶匹斯大劍、志留亞樹矛、爪痕聖印記", shield: "熔爐角盾", armor: "奧陶匹斯套", talisman: "亞歷山大的碎片、葛孚雷肖像、群聚信徒立誓布、腐敗翼劍徽章", spell: "黃金樹立誓、火焰啊賜予我力、熔爐百相:尾、熔爐百相:角、熔爐百相:息", skill: "-" },
-            { cat: "本體職業", id: 34, name: "功夫拳師", stat: "純信", weapon: "拳劍、黃金樹聖印記", shield: "-", armor: "聖樹騎士頭、黑焰習武修士身、鱗片手、腳", talisman: "龍徽大盾護符、矛護符、腐敗翼劍徽章、米莉森的義手", spell: "黃金樹立誓、雷武器、血焰刀刃、聖律劍刃、黃金之怒", skill: "貫穿" },
-            { cat: "本體職業", id: 35, name: "烈焰護衛", stat: "力/信", weapon: "彎曲棍棒、黃金樹聖印記或指頭聖印記", shield: "-", armor: "滲血頭、手,黑焰習武修士身、腳", talisman: "火蠍護符、大山羊護符、龍徽大盾護符、亞歷山大的碎片", spell: "惡神火焰、感受巨人火焰吧、黑焰、狂亂火球、黃金樹立誓、火焰啊賜予我力", skill: "炎擊" },
-            { cat: "本體職業", id: 36, name: "閃焰黑劍", stat: "敏/信", weapon: "鉤爪", shield: "-", armor: "黑劍套或騎士套", talisman: "火蠍護符、龍徽大盾護符、腐敗翼劍徽章、亞歷山大的碎片或戰士壺碎片", spell: "-", skill: "炎擊" },
-            { cat: "本體職業", id: 37, name: "角鬥士", stat: "純力", weapon: "高地斧", shield: "紅獅子大盾", armor: "腐敗鬥士套", talisman: "亞歷山大的碎片、短劍護符、大山羊護符、染藍兇刀、米莉森的義手", spell: "-", skill: "箭步(上砍)" },
-            { cat: "本體職業", id: 38, name: "魔像守衛", stat: "純力", weapon: "魔像戟", shield: "-", armor: "龍裝大樹守衛套", talisman: "曲劍護符、鉤爪護符、斧護符、龍徽大盾護符", spell: "-", skill: "侍王騎士的決心" },
-            { cat: "本體職業", id: 39, name: "咒術守衛", stat: "純力", weapon: "看門犬錫杖、任意聖印記", shield: "-", armor: "維克套", talisman: "獻鬥劍護符、魔蠍護符、綠龜護符、鉤爪護符", spell: "火焰啊賜予我力、黃金樹立誓", skill: "-" },
-            { cat: "本體職業", id: 40, name: "猛毒血刃", stat: "感/敏", weapon: "剝屍曲劍、山賊彎刀", shield: "-", armor: "白面具或蘑菇頭、鱗片套", talisman: "米莉森的義手、翼劍徽章、腐敗眷屬的狂喜、鮮血君王的狂喜", spell: "-", skill: "毒霧(剝)、切腹(山)" },
-            { cat: "本體職業", id: 41, name: "重力之神", stat: "力敏", weapon: "星獸半顎、任意聖印記", shield: "-", armor: "老翁頭、猛禽黑羽、維克手、鱗片腳", talisman: "亞歷山大的碎片、獻鬥劍護符、卡利亞徽章、龍徽大盾護符", spell: "火焰啊賜予我力", skill: "-" },
-            { cat: "本體職業", id: 42, name: "巨物粉碎者", stat: "純力", weapon: "粉碎巨人槌、高地斧", shield: "-", armor: "大山羊套", talisman: "咆哮護符、亞歷山大的碎片、染藍兇刀、染紅兇刀", spell: "-", skill: "山妖咆哮" },
-            { cat: "本體職業", id: 43, name: "血腥射手", stat: "敏/感", weapon: "黑弓", shield: "-", armor: "白面具、死眠少女圍裙", talisman: "獻鬥劍護符、亞歷山大的碎片、硬箭護符、矛護符或鮮血君王的狂喜", spell: "-", skill: "-" },
-            { cat: "本體職業", id: 44, name: "審判官", stat: "力敏", weapon: "基薩的刺輪", shield: "水母盾", armor: "巨盔、眼眸筒形外衣、鎖子手、鎖子腳", talisman: "斧護符、鮮血君王的狂喜、鉤爪護符、米莉森的義手", spell: "-", skill: "-" },
-            { cat: "本體職業", id: 45, name: "卡利亞騎士", stat: "敏/智", weapon: "羅雷塔戰鐮", shield: "-", armor: "羅雷塔套", talisman: "大山羊護符、龍徽大盾護符、米莉森義手、腐敗義劍徽章", spell: "冰霧", skill: "-" },
-            { cat: "本體職業", id: 46, name: "碎星", stat: "力/智", weapon: "碎星大劍、活祭品斧", shield: "-", armor: "碎星套", talisman: "腐敗義劍徽章、米莉森義手、亞歷山大碎片、大壺重武", spell: "-", skill: "-" },
-            { cat: "本體職業", id: 47, name: "黑色之箭", stat: "純敏", weapon: "黑弓、任意聖印記", shield: "-", armor: "黑刀頭、馬雷身", talisman: "古王硬箭徽章、亞歷山大碎片、藍色舞孃", spell: "黃金樹立誓、火賜", skill: "-" },
-            { cat: "本體職業", id: 48, name: "艾爾登之王", stat: "力敏", weapon: "葛孚雷王斧、高地斧", shield: "-", armor: "葛孚雷套", talisman: "咆嘯鍊墜、亞歷山大碎片、龍徽大盾、斧護符", spell: "-", skill: "荷萊露的撼地" },
-            { cat: "本體職業", id: 49, name: "龍麟大名", stat: "純敏", weapon: "龍麟刀、打刀", shield: "水母盾", armor: "狼哥套、老翁頭", talisman: "腐敗義劍徽章、米莉森義手、亞歷山大碎片、龍徽大盾", spell: "-", skill: "炎擊" },
-            { cat: "本體職業", id: 50, name: "死神", stat: "敏/感", weapon: "墓地大鐮刀、龍饗印記", shield: "-", armor: "王骸套", talisman: "腐敗義劍徽章、米莉森義手、亞歷山大碎片、鮮血君王的歡愉", spell: "血焰刀刃、毒武器、黃金樹立誓、火賜、毒霧、蠅群", skill: "喚起風暴" },
-            { cat: "本體職業", id: 51, name: "閃焰行刑者", stat: "純力", weapon: "弦月斧", shield: "-", armor: "戰鬼頭、身狼哥手、腳", talisman: "亞歷山大碎片、龍徽大盾、斧護符、火對蠍", spell: "-", skill: "炎擊" },
-            { cat: "本體職業", id: 52, name: "海摩重兵", stat: "力/智", weapon: "泥人魚叉、學院輝石杖", shield: "杜鵑大盾", armor: "狼哥身、杜鵑騎士套", talisman: "亞歷山大碎片、曲劍護符、矛護符、腐敗翼劍徽章", spell: "魔法之境、魔力武器、結冰武器、海摩大槌、海摩砲彈", skill: "連擊突刺" },
-            { cat: "本體職業", id: 53, name: "寒風牧師", stat: "敏", weapon: "鐵塊鏈枷", shield: "杜鵑大盾", armor: "瑪雷頭、貴族旅行衣、鱗片手、腳", talisman: "大山羊護符、亞歷山大碎片、腐敗義劍徽章、米莉森義手", spell: "火焰重罪", skill: "喚起風暴" },
-            { cat: "本體職業", id: 54, name: "征服者", stat: "力敏", weapon: "龍戟、任意聖印記", shield: "-", armor: "格密爾騎士、杜鵑騎士", talisman: "亞歷山大碎片、獻鬥劍護符、龍徽大盾護符、矛護符", spell: "火賜", skill: "-" },
-            { cat: "本體職業", id: 55, name: "黃金碎擊", stat: "力/信", weapon: "瑪莉卡石錘", shield: "金黃大盾", armor: "大樹守衛頭、身、羅德爾騎士套", talisman: "亞歷山大碎片、龍徽大盾護符、曲劍護符", spell: "黃金樹立誓、火賜", skill: "-" },
-            { cat: "本體職業", id: 56, name: "波動戰士", stat: "純力", weapon: "遺跡大劍、任意聖印記", shield: "-", armor: "巨盔、聚獸套", talisman: "掠奪浮雕墜飾、卡利亞徽章、大壺重武、亞歷山大碎片", spell: "火賜", skill: "-" },
-            { cat: "本體職業", id: 57, name: "高塔騎士", stat: "純力", weapon: "晨星錘、巨型矛錘", shield: "逆鷹塔盾", armor: "騎士套", talisman: "綠龜護符、斧護符、曲劍護符、大盾護符", spell: "火賜", skill: "岩石劍" },
-            { cat: "本體職業", id: 58, name: "猩紅之槍", stat: "敏", weapon: "腐敗結晶矛", shield: "盤蛇盾", armor: "紅獅子騎士套", talisman: "腐敗眷屬的歡愉、翼劍徽章、米莉森的義手、矛護符", spell: "-", skill: "突擊/毒蛇咬" },
-            { cat: "本體職業", id: 59, name: "凍霜聖騎士", stat: "敏", weapon: "薩米爾彎刀、爪痕聖印記", shield: "鳶形盾", armor: "指痕套", talisman: "亞歷山大的碎片、魔蠍護符、曲劍護符、染藍兇刀", spell: "黃金樹立誓、黃金樹恩惠、恢復", skill: "薩米爾冰風暴" },
-            { cat: "本體職業", id: 60, name: "尋血獵犬", stat: "敏/力", weapon: "獵犬長牙", shield: "-", armor: "猛禽黑羽、獵犬騎士套", talisman: "大山羊護符、亞歷山大的碎片、鉤爪護符、龍徽大盾護符", spell: "-", skill: "獵犬劍技" },
-            { cat: "本體職業", id: 61, name: "鮮血武士", stat: "敏/感", weapon: "屍山血海、活祭品斧、龍饗印記", shield: "-", armor: "鮮血貴族套、龍騎士手、腳", talisman: "鮮血君王的歡愉、腐敗翼劍徽章、卡利亞徽章、亞歷山大的碎片", spell: "火賜", skill: "屍橫遍野" },
-            { cat: "本體職業", id: 62, name: "雷電之龍", stat: "純敏", weapon: "古蘭桑克斯的雷電、尊腐騎士矛", shield: "黃金大盾", armor: "側室面具、羅德爾騎士套", talisman: "亞歷山大的碎片、拉達岡的糜爛烙印、獻鬥劍護符、卡利亞徽章", spell: "黃金樹立誓、黃金樹恩惠、火賜", skill: "古雷電槍" },
-            { cat: "本體職業", id: 63, name: "黃金冠軍", stat: "純敏", weapon: "儀式直劍、任意聖印記", shield: "失鄉騎士盾", armor: "失鄉騎士套", talisman: "翼劍徽章、米莉森的義手、龍徽大盾護符、矛護符", spell: "黃金樹立誓、黃金樹恩惠、火賜", skill: "黃金劍技、黃金格擋" },
-            { cat: "本體職業", id: 64, name: "蛇骨武士", stat: "純敏", weapon: "蛇骨刀、打刀", shield: "-", armor: "待殮套裝", talisman: "腐敗眷屬的歡愉、米莉森的義手、翼劍徽章、亞歷山大的碎片", spell: "-", skill: "二連斬、毒蛾飛舞、格擋" },
-            { cat: "本體職業", id: 65, name: "咆哮星拳", stat: "純力", weapon: "星拳、高地斧、癲火聖印記", shield: "-", armor: "布萊澤套裝", talisman: "咆哮鍊墜、亞歷山大的碎片、鮮血君王的歡愉、腐敗翼劍徽章", spell: "血焰刀刃", skill: "野獸咆哮" },
-            { cat: "本體職業", id: 66, name: "水鳥劍士", stat: "純敏", weapon: "瑪蓮妮亞的義手刀", shield: "-", armor: "尊腐騎士套", talisman: "亞歷山大的碎片、米莉森的義手、翼劍徽章、龍徽大盾護符", spell: "-", skill: "水鳥亂舞" },
-            { cat: "本體職業", id: 67, name: "顛火之王", stat: "敏/感", weapon: "蒙葛特咒劍、龍饗印記、癲火聖印記", shield: "-", armor: "隱匿面具、惡兆妖鬼斗篷", talisman: "亞歷山大的碎片、火對蠍、獻鬥劍護符、龍徽大盾護符", spell: "蠅群、黃金樹立誓、火賜、難耐癲火、劃空癲火", skill: "咒血斬擊" },
-            { cat: "本體職業", id: 68, name: "沉睡女劍士", stat: "敏/智", weapon: "托莉娜劍", shield: "-", armor: "諾克斯劍士頭冠、黑夜女巫套", talisman: "祖靈角、大壺眾武護符、米莉森的義手、腐敗翼劍徽章", spell: "-", skill: "催眠煙霧" },
-            { cat: "本體職業", id: 69, name: "貴族劍客", stat: "純敏", weapon: "權貴細身劍 (或 君王軍直劍)", shield: "-", armor: "權貴帽子、隨從上衣、調香師手套、隨從長褲", talisman: "藍色舞孃護符、亞歷山大的碎片、龍徽大盾護符", spell: "-", skill: "準備架式" },
-            { cat: "本體職業", id: 70, name: "鮮血芭蕾", stat: "感/敏", weapon: "鮮血旋流", shield: "-", armor: "馬雷面具、卡利亞騎士衣、大山羊臂甲、鱗片腿甲", talisman: "亞歷山大的碎片、鮮血君王的歡愉、綠龜護符、綠琥珀鍊墜+2", spell: "-", skill: "王朝劍技" },
-            { cat: "本體職業", id: 71, name: "龍舞者", stat: "感/敏", weapon: "歐赫寶劍、龍饗印記", shield: "-", armor: "隱匿面具、流刑士兵鎧甲、獵犬騎士手套、獵犬騎士腿甲", talisman: "亞歷山大的碎片、腐敗翼劍徽章、米莉森的義手、葛孚雷的肖像", spell: "黃金樹立誓、火賜、龍爪、龍咬、亞基爾的火焰、艾格基斯的腐敗、桂奧爾的咆哮", skill: "歐赫劍舞" },
-            { cat: "本體職業", id: 72, name: "歐赫行刑官", stat: "力/感", weapon: "瑪雷家行刑劍", shield: "失鄉騎士盾", armor: "騎士頭盔、眼眸筒形外衣、鎖子手套、鎖子腿甲", talisman: "腐敗翼劍徽章、米莉森的義手、亞歷山大的碎片、葛孚雷的肖像", spell: "火賜", skill: "歐赫劍舞" },
-            { cat: "本體職業", id: 73, name: "龍戰士", stat: "感/敏", weapon: "山賊彎刀 x2 (戰灰: 切腹)", shield: "-", armor: "白面具、宿將套裝", talisman: "鮮血君王的歡愉、源輝石刀、米莉森的義手、腐敗翼劍徽章", spell: "黃金樹立誓、恩惠賜福、艾格基斯的腐敗、龍爪、龍咬", skill: "切腹" },
-            { cat: "本體職業", id: 74, name: "魔法龍騎士", stat: "純感", weapon: "波紋劍、龍饗印記", shield: "水母盾", armor: "異形龍鎧甲", talisman: "魔力對蠍、獻鬥劍護符、曲劍護符、群聚信徒的立誓布", spell: "黃金樹立誓、史瑪拉格的輝石吐息、亞基爾的火焰、波列琉斯的冰霧、艾格基斯的腐敗", skill: "共鳴憤怒" },
-            { cat: "本體職業", id: 75, name: "深紅決鬥者", stat: "敏/感", weapon: "羅傑爾刺劍", shield: "任意小盾", armor: "白面具、盜賊面罩、隨從套(黑)", talisman: "腐敗翼劍徽章、米莉森的義手、鮮血君王的歡愉、矛護符/匕首護符", spell: "-", skill: "切腹、卡利亞奉還" },
+            { cat: "本體職業", id: 12, name: "黃金之劍", stat: "純信", weapon: "秘文劍、夜與火之直劍、黃金律法聖印記", shield: "藍金鳶形盾", armor: "金面具、百智套", talisman: "聖蠍護符、獻鬥劍護符、獻鬥盾護符、龍徽大盾護符", spell: "黃金樹立誓、黃金樹恩惠", skill: "-" },
+            { cat: "本體職業", id: 13, name: "靈魂武士", stat: "智/敏", weapon: "長牙、學院輝石杖", shield: "-", armor: "黑刀套", talisman: "亞歷山大的碎片、魔蠍護符", spell: "巨劍陣", skill: "二連斬" },
+            { cat: "本體職業", id: 14, name: "死術師", stat: "智/信", weapon: "夜與火之直劍、死亡子杖", shield: "-", armor: "菲雅套", talisman: "大魔法師球、葛孚雷雕像", spell: "古老死亡怨魂", skill: "-" },
+            { cat: "本體職業", id: 15, name: "戰巫", stat: "純智", weapon: "卡利亞權杖", shield: "卡利亞騎士盾", armor: "聚獸套", talisman: "大魔法師球、龍徽大盾護符", spell: "海摩大槌", skill: "-" },
+            { cat: "本體職業", id: 16, name: "沉默喚矛師", stat: "敏/智", weapon: "死亡儀式矛", shield: "-", armor: "黑刀套", talisman: "亞歷山大的碎片、魔蠍護符", spell: "黑夜彗星", skill: "-" },
+            { cat: "本體職業", id: 17, name: "鬼劍", stat: "敏/智", weapon: "死亡鈞棒", shield: "-", armor: "黑劍套", talisman: "亞歷山大的碎片", spell: "-", skill: "-" },
+            { cat: "本體職業", id: 18, name: "卡利亞屠夫", stat: "力/智", weapon: "鐵柴刀", shield: "水母盾", armor: "羅傑爾套", talisman: "斧護符", spell: "巨劍陣", skill: "侍王騎士的決心" },
+            { cat: "本體職業", id: 19, name: "魔法盜賊", stat: "敏/智", weapon: "輝石克力士", shield: "-", armor: "黑刀套", talisman: "葛孚雷肖像", spell: "-", skill: "卡利亞式奉還" },
+            { cat: "本體職業", id: 20, name: "蒼藍之拳", stat: "力/智", weapon: "鐵球拳套", shield: "-", armor: "鱗片套", talisman: "腐敗翼劍徽章", spell: "魔力武器", skill: "忍耐" },
+            { cat: "本體職業", id: 21, name: "秘紅雷霆", stat: "純信", weapon: "碎石聖印記", shield: "-", armor: "孿生套", talisman: "雷蠍護符", spell: "古龍雷擊", skill: "-" },
+            { cat: "本體職業", id: 22, name: "純正聖騎士", stat: "純信", weapon: "秘文劍", shield: "聖樹大盾", armor: "聖樹騎士套", talisman: "聖蠍護符", spell: "黃金樹立誓", skill: "-" },
+            { cat: "本體職業", id: 23, name: "黃金十字軍", stat: "力/信", weapon: "石像鬼大劍", shield: "黃銅盾", armor: "黃金筒形外衣", talisman: "亞歷山大的碎片", spell: "黃金樹恩惠", skill: "劍舞" },
+            { cat: "本體職業", id: 24, name: "瀆神先鋒", stat: "信/力", weapon: "褻瀆聖劍", shield: "-", armor: "大樹守衛套", talisman: "亞歷山大的碎片", spell: "火賜", skill: "炎擊" },
+            { cat: "本體職業", id: 25, name: "黑焰武士", stat: "敏/信", weapon: "長牙", shield: "-", armor: "待殮套", talisman: "拉達岡糜爛烙印", spell: "血焰刀刃", skill: "二連斬" },
+            { cat: "本體職業", id: 26, name: "黑刀刺客", stat: "敏/信", weapon: "黑刀", shield: "-", armor: "黑刀套", talisman: "染藍兇刀", spell: "-", skill: "幻影共擊" },
+            { cat: "本體職業", id: 27, name: "烈焰舞者", stat: "信/敏", weapon: "雙刀", shield: "-", armor: "火焰修士套", talisman: "火蠍護符", spell: "狂亂火球", skill: "炎擊" },
+            { cat: "本體職業", id: 28, name: "黑劍", stat: "力/信", weapon: "瑪利喀斯的黑劍", shield: "-", armor: "黑劍套", talisman: "亞歷山大的碎片", spell: "黑劍", skill: "-" },
+            { cat: "本體職業", id: 29, name: "弒神者", stat: "敏/信", weapon: "狩獵神祇大劍", shield: "-", armor: "大山羊套", talisman: "卡利亞徽章", spell: "-", skill: "-" },
+            { cat: "本體職業", id: 30, name: "劍之聖者", stat: "敏/信", weapon: "神軀化劍", shield: "-", armor: "聖樹騎士套", talisman: "亞歷山大的碎片", spell: "-", skill: "-" },
+            { cat: "本體職業", id: 31, name: "火焰術士", stat: "純信", weapon: "巨人聖印記", shield: "-", armor: "調香師套", talisman: "火蠍護符", spell: "惡神火焰", skill: "-" },
+            { cat: "本體職業", id: 32, name: "龍騎士", stat: "力/信", weapon: "土龍麟劍", shield: "-", armor: "龍騎士套", talisman: "亞歷山大的碎片", spell: "火賜", skill: "-" },
+            { cat: "本體職業", id: 33, name: "熔爐騎士", stat: "力/信", weapon: "奧陶匹斯大劍", shield: "熔爐角盾", armor: "奧陶匹斯套", talisman: "葛孚雷肖像", spell: "熔爐百相", skill: "-" },
+            { cat: "本體職業", id: 34, name: "功夫拳師", stat: "純信", weapon: "拳劍", shield: "-", armor: "黑焰習武修士身", talisman: "腐敗翼劍徽章", spell: "雷武器", skill: "貫穿" },
+            { cat: "本體職業", id: 35, name: "烈焰護衛", stat: "力/信", weapon: "彎曲棍棒", shield: "-", armor: "滲血頭", talisman: "火蠍護符", spell: "感受巨人火焰吧", skill: "炎擊" },
+            { cat: "本體職業", id: 36, name: "閃焰黑劍", stat: "敏/信", weapon: "鉤爪", shield: "-", armor: "黑劍套", talisman: "火蠍護符", spell: "-", skill: "炎擊" },
+            { cat: "本體職業", id: 37, name: "角鬥士", stat: "純力", weapon: "高地斧", shield: "紅獅子大盾", armor: "腐敗鬥士套", talisman: "亞歷山大的碎片", spell: "-", skill: "箭步" },
+            { cat: "本體職業", id: 38, name: "魔像守衛", stat: "純力", weapon: "魔像戟", shield: "-", armor: "龍裝大樹守衛套", talisman: "鉤爪護符", spell: "-", skill: "侍王騎士的決心" },
+            { cat: "本體職業", id: 39, name: "咒術守衛", stat: "純力", weapon: "看門犬錫杖", shield: "-", armor: "維克套", talisman: "魔蠍護符", spell: "黃金樹立誓", skill: "-" },
+            { cat: "本體職業", id: 40, name: "猛毒血刃", stat: "感/敏", weapon: "山賊彎刀", shield: "-", armor: "白面具", talisman: "米莉森的義手", spell: "-", skill: "切腹" },
+            { cat: "本體職業", id: 41, name: "重力之神", stat: "力敏", weapon: "星獸半顎", shield: "-", armor: "猛禽黑羽", talisman: "亞歷山大的碎片", spell: "火賜", skill: "-" },
+            { cat: "本體職業", id: 42, name: "巨物粉碎者", stat: "純力", weapon: "粉碎巨人槌", shield: "-", armor: "大山羊套", talisman: "咆哮護符", spell: "-", skill: "山妖咆哮" },
+            { cat: "本體職業", id: 43, name: "血腥射手", stat: "敏/感", weapon: "黑弓", shield: "-", armor: "白面具", talisman: "亞歷山大的碎片", spell: "-", skill: "-" },
+            { cat: "本體職業", id: 44, name: "審判官", stat: "力敏", weapon: "基薩的刺輪", shield: "水母盾", armor: "眼眸筒形外衣", talisman: "鮮血君王的歡愉", spell: "-", skill: "-" },
+            { cat: "本體職業", id: 45, name: "卡利亞騎士", stat: "敏/智", weapon: "羅雷塔戰鐮", shield: "-", armor: "羅雷塔套", talisman: "龍徽大盾護符", spell: "冰霧", skill: "-" },
+            { cat: "本體職業", id: 46, name: "碎星", stat: "力/智", weapon: "碎星大劍", shield: "-", armor: "碎星套", talisman: "腐敗義劍徽章", spell: "-", skill: "-" },
+            { cat: "本體職業", id: 47, name: "黑色之箭", stat: "純敏", weapon: "黑弓", shield: "-", armor: "馬雷身", talisman: "藍色舞孃", spell: "火賜", skill: "-" },
+            { cat: "本體職業", id: 48, name: "艾爾登之王", stat: "力敏", weapon: "葛孚雷王斧", shield: "-", armor: "葛孚雷套", talisman: "咆嘯鍊墜", spell: "-", skill: "荷萊露的撼地" },
+            { cat: "本體職業", id: 49, name: "龍麟大名", stat: "純敏", weapon: "龍麟刀", shield: "水母盾", armor: "狼哥套", talisman: "米莉森義手", spell: "-", skill: "炎擊" },
+            { cat: "本體職業", id: 50, name: "死神", stat: "敏/感", weapon: "墓地大鐮刀", shield: "-", armor: "王骸套", talisman: "鮮血君王的歡愉", spell: "血焰刀刃", skill: "喚起風暴" },
+            { cat: "本體職業", id: 51, name: "閃焰行刑者", stat: "純力", weapon: "弦月斧", shield: "-", armor: "戰鬼套", talisman: "亞歷山大碎片", spell: "-", skill: "炎擊" },
+            { cat: "本體職業", id: 52, name: "海摩重兵", stat: "力/智", weapon: "泥人魚叉", shield: "杜鵑大盾", armor: "杜鵑騎士套", talisman: "亞歷山大碎片", spell: "海摩大槌", skill: "連擊突刺" },
+            { cat: "本體職業", id: 53, name: "寒風牧師", stat: "敏", weapon: "鐵塊鏈枷", shield: "杜鵑大盾", armor: "貴族旅行衣", talisman: "腐敗義劍徽章", spell: "火焰重罪", skill: "喚起風暴" },
+            { cat: "本體職業", id: 54, name: "征服者", stat: "力敏", weapon: "龍戟", shield: "-", armor: "格密爾騎士", talisman: "亞歷山大碎片", spell: "火賜", skill: "-" },
+            { cat: "本體職業", id: 55, name: "黃金碎擊", stat: "力/信", weapon: "瑪莉卡石錘", shield: "金黃大盾", armor: "大樹守衛頭", talisman: "亞歷山大碎片", spell: "黃金樹立誓", skill: "-" },
+            { cat: "本體職業", id: 56, name: "波動戰士", stat: "純力", weapon: "遺跡大劍", shield: "-", armor: "聚獸套", talisman: "亞歷山大碎片", spell: "火賜", skill: "-" },
+            { cat: "本體職業", id: 57, name: "高塔騎士", stat: "純力", weapon: "晨星錘", shield: "逆鷹塔盾", armor: "騎士套", talisman: "曲劍護符", spell: "火賜", skill: "岩石劍" },
+            { cat: "本體職業", id: 58, name: "猩紅之槍", stat: "敏", weapon: "腐敗結晶矛", shield: "盤蛇盾", armor: "紅獅子騎士套", talisman: "腐敗眷屬的歡愉", spell: "-", skill: "突擊" },
+            { cat: "本體職業", id: 59, name: "凍霜聖騎士", stat: "敏", weapon: "薩米爾彎刀", shield: "鳶形盾", armor: "指痕套", talisman: "亞歷山大的碎片", spell: "黃金樹恩惠", skill: "薩米爾冰風暴" },
+            { cat: "本體職業", id: 60, name: "尋血獵犬", stat: "敏/力", weapon: "獵犬長牙", shield: "-", armor: "猛禽黑羽", talisman: "亞歷山大的碎片", spell: "-", skill: "獵犬劍技" },
+            { cat: "本體職業", id: 61, name: "鮮血武士", stat: "敏/感", weapon: "屍山血海", shield: "-", armor: "鮮血貴族套", talisman: "鮮血君王的歡愉", spell: "火賜", skill: "屍橫遍野" },
+            { cat: "本體職業", id: 62, name: "雷電之龍", stat: "純敏", weapon: "古蘭桑克斯的雷電", shield: "黃金大盾", armor: "側室面具", talisman: "亞歷山大的碎片", spell: "黃金樹恩惠", skill: "古雷電槍" },
+            { cat: "本體職業", id: 63, name: "黃金冠軍", stat: "純敏", weapon: "儀式直劍", shield: "失鄉騎士盾", armor: "失鄉騎士套", talisman: "翼劍徽章", spell: "火賜", skill: "黃金劍技" },
+            { cat: "本體職業", id: 64, name: "蛇骨武士", stat: "純敏", weapon: "蛇骨刀", shield: "-", armor: "待殮套裝", talisman: "腐敗眷屬的歡愉", spell: "-", skill: "毒蛾飛舞" },
+            { cat: "本體職業", id: 65, name: "咆哮星拳", stat: "純力", weapon: "星拳", shield: "-", armor: "布萊澤套裝", talisman: "咆哮鍊墜", spell: "血焰刀刃", skill: "野獸咆哮" },
+            { cat: "本體職業", id: 66, name: "水鳥劍士", stat: "純敏", weapon: "瑪蓮妮亞的義手刀", shield: "-", armor: "尊腐騎士套", talisman: "亞歷山大的碎片", spell: "-", skill: "水鳥亂舞" },
+            { cat: "本體職業", id: 67, name: "顛火之王", stat: "敏/感", weapon: "蒙葛特咒劍", shield: "-", armor: "惡兆妖鬼斗篷", talisman: "火對蠍", spell: "難耐癲火", skill: "咒血斬擊" },
+            { cat: "本體職業", id: 68, name: "沉睡女劍士", stat: "敏/智", weapon: "托莉娜劍", shield: "-", armor: "黑夜女巫套", talisman: "米莉森的義手", spell: "-", skill: "催眠煙霧" },
+            { cat: "本體職業", id: 69, name: "貴族劍客", stat: "純敏", weapon: "權貴細身劍", shield: "-", armor: "隨從上衣", talisman: "藍色舞孃護符", spell: "-", skill: "準備架式" },
+            { cat: "本體職業", id: 70, name: "鮮血芭蕾", stat: "感/敏", weapon: "鮮血旋流", shield: "-", armor: "卡利亞騎士衣", talisman: "鮮血君王的歡愉", spell: "-", skill: "王朝劍技" },
+            { cat: "本體職業", id: 71, name: "龍舞者", stat: "感/敏", weapon: "歐赫寶劍", shield: "-", armor: "流刑士兵鎧甲", talisman: "腐敗翼劍徽章", spell: "龍爪", skill: "歐赫劍舞" },
+            { cat: "本體職業", id: 72, name: "歐赫行刑官", stat: "力/感", weapon: "瑪雷家行刑劍", shield: "失鄉騎士盾", armor: "眼眸筒形外衣", talisman: "米莉森的義手", spell: "火賜", skill: "歐赫劍舞" },
+            { cat: "本體職業", id: 73, name: "龍戰士", stat: "感/敏", weapon: "山賊彎刀", shield: "-", armor: "宿將套裝", talisman: "鮮血君王的歡愉", spell: "龍咬", skill: "切腹" },
+            { cat: "本體職業", id: 74, name: "魔法龍騎士", stat: "純感", weapon: "波紋劍", shield: "水母盾", armor: "異形龍鎧甲", talisman: "魔力對蠍", spell: "輝石吐息", skill: "共鳴憤怒" },
+            { cat: "本體職業", id: 75, name: "深紅決鬥者", stat: "敏/感", weapon: "羅傑爾刺劍", shield: "小盾", armor: "白面具", talisman: "鮮血君王的歡愉", spell: "-", skill: "切腹" },
             
             // DLC 職業 1-34
-            { cat: "DLC 職業", id: 1, name: "雙劍鬥士", stat: "敏/信", weapon: "角戰士曲劍、黃金樹聖印記", shield: "-", armor: "神鳥戰士頭、雷妲盔甲、羅德爾騎士手、龍裝大樹守衛腳", talisman: "-", spell: "黃金樹立誓、火賜", skill: "-" },
-            { cat: "DLC 職業", id: 2, name: "隙間月影", stat: "智/敏", weapon: "名刀月隱", shield: "-", armor: "老翁頭、諾克斯劍士身、腳、百智手", talisman: "-", spell: "-", skill: "-" },
-            { cat: "DLC 職業", id: 3, name: "影輪草暴徒", stat: "力/信", weapon: "影輪草", shield: "爪痕聖印記/黃金樹聖印記", armor: "南瓜頭、猛禽黑羽、碎星手、腳", talisman: "-", spell: "黃金樹立誓、火賜、艾爾登流星", skill: "-" },
-            { cat: "DLC 職業", id: 4, name: "卡利亞之盾", stat: "力/智", weapon: "-", shield: "卡利亞突刺盾", armor: "羅雷塔套、雙月身", talisman: "-", spell: "-", skill: "岩石劍" },
-            { cat: "DLC 職業", id: 5, name: "黑夜之錘", stat: "力/信", weapon: "黑鐵大錘、黃金律法聖印記", shield: "黑鐵大盾", armor: "黑夜頭、手、黑騎士身、腳", talisman: "-", spell: "黃金樹立誓", skill: "神聖刀刃/祈禱一擊" },
-            { cat: "DLC 職業", id: 6, name: "熔岩使者", stat: "信/力", weapon: "熔岩刀", shield: "獨眼盾", armor: "火焰騎士頭、身、鱗片手、腳", talisman: "-", spell: "-", skill: "-" },
-            { cat: "DLC 職業", id: 7, name: "暗夜之爪", stat: "純敏", weapon: "黑夜爪", shield: "梅瑟莫士兵盾", armor: "黑騎士套、雷姐身", talisman: "-", spell: "-", skill: "-" },
-            { cat: "DLC 職業", id: 8, name: "風之祝福", stat: "敏", weapon: "梅瑟莫士兵矛", shield: "梅瑟莫士兵盾", armor: "托莉娜花、高地套", talisman: "-", spell: "-", skill: "侍王騎士的決心、風暴障壁" },
-            { cat: "DLC 職業", id: 9, name: "全知聖者", stat: "智/信", weapon: "夜與火之直劍、無上遠方杖", shield: "-", armor: "巨盔、百智套", talisman: "-", spell: "相疊光環、艾爾登流星、騎士雷電槍、古龍雷擊、惡神火焰、感受巨人火焰吧、發狂擴散、拉卡德怨魂、古老死亡怨魂、黑夜彗星、羅雷塔大弓、融泥旋蟲絲槍、古蘭格岩石、獸石、黃金樹恩惠、黃金樹立誓", skill: "-" },
-            { cat: "DLC 職業", id: 10, name: "卡利亞流放騎士", stat: "力/智", weapon: "大劍、卡利亞權杖", shield: "-", armor: "羅傑爾套", talisman: "-", spell: "魔法之境、巨劍陣、帚星、卡利亞迅劍、卡利亞貫刺、米莉安的消失", skill: "尊矣卡利亞" },
-            { cat: "DLC 職業", id: 11, name: "雙龍", stat: "力敏", weapon: "丹恩流踢擊術/落葉派拳法", shield: "-", armor: "龍心臟", talisman: "-", spell: "-", skill: "雙刺毒花" },
+            { cat: "DLC 職業", id: 1, name: "雙劍鬥士", stat: "敏/信", weapon: "角戰士曲劍", shield: "-", armor: "雷妲盔甲", talisman: "-", spell: "火賜", skill: "-" },
+            { cat: "DLC 職業", id: 2, name: "隙間月影", stat: "智/敏", weapon: "名刀月隱", shield: "-", armor: "老翁頭", talisman: "-", spell: "-", skill: "-" },
+            { cat: "DLC 職業", id: 3, name: "影輪草暴徒", stat: "力/信", weapon: "影輪草", shield: "聖印記", armor: "南瓜頭", talisman: "-", spell: "黃金樹立誓", skill: "-" },
+            { cat: "DLC 職業", id: 4, name: "卡利亞之盾", stat: "力/智", weapon: "-", shield: "卡利亞突刺盾", armor: "雙月身", talisman: "-", spell: "-", skill: "岩石劍" },
+            { cat: "DLC 職業", id: 5, name: "黑夜之錘", stat: "力/信", weapon: "黑鐵大錘", shield: "黑鐵大盾", armor: "黑夜套", talisman: "-", spell: "黃金樹立誓", skill: "祈禱一擊" },
+            { cat: "DLC 職業", id: 6, name: "熔岩使者", stat: "信/力", weapon: "熔岩刀", shield: "獨眼盾", armor: "火焰騎士套", talisman: "-", spell: "-", skill: "-" },
+            { cat: "DLC 職業", id: 7, name: "暗夜之爪", stat: "純敏", weapon: "黑夜爪", shield: "-", armor: "黑騎士套", talisman: "-", spell: "-", skill: "-" },
+            { cat: "DLC 職業", id: 8, name: "風之祝福", stat: "敏", weapon: "梅瑟莫士兵矛", shield: "梅瑟莫士兵盾", armor: "高地套", talisman: "-", spell: "-", skill: "風暴障壁" },
+            { cat: "DLC 職業", id: 9, name: "全知聖者", stat: "智/信", weapon: "無上遠方杖", shield: "-", armor: "百智套", talisman: "-", spell: "騎士雷電槍", skill: "-" },
+            { cat: "DLC 職業", id: 10, name: "卡利亞流放騎士", stat: "力/智", weapon: "大劍", shield: "-", armor: "羅傑爾套", talisman: "-", spell: "帚星", skill: "尊矣卡利亞" },
+            { cat: "DLC 職業", id: 11, name: "雙龍", stat: "力敏", weapon: "丹恩流踢擊術", shield: "-", armor: "龍心臟", talisman: "-", spell: "-", skill: "雙刺毒花" },
             { cat: "DLC 職業", id: 12, name: "鮮血之槍", stat: "力/感", weapon: "劍形長矛", shield: "-", armor: "蓋烏斯套", talisman: "-", spell: "-", skill: "鮮血徵收" },
-            { cat: "DLC 職業", id: 13, name: "貫刺聖騎士", stat: "敏/信", weapon: "雷妲劍、任意聖印記", shield: "-", armor: "誓約騎士頭、雷姐身、黑騎士手、腳", talisman: "-", spell: "黃金樹立誓、火賜", skill: "-" },
-            { cat: "DLC 職業", id: 14, name: "風暴之刃", stat: "力敏", weapon: "大刀", shield: "-", armor: "神獸戰士頭、身、角戰士手、狼哥腳", talisman: "-", spell: "-", skill: "風暴刃/喚起風暴" },
-            { cat: "DLC 職業", id: 15, name: "梅瑟莫之火", stat: "信/力", weapon: "火焰騎士大劍、昆蘭大劍、火焰騎士短劍、火焰騎士聖印記", shield: "-", armor: "梅瑟莫頭、火焰騎士套", talisman: "-", spell: "黃金樹立誓、火賜、燃火、火焰蛇、梅瑟莫火焰", skill: "火焰槍、火焰穿刺" },
-            { cat: "DLC 職業", id: 16, name: "風暴之箭", stat: "純敏", weapon: "白金弓、安帕赫長弓", shield: "-", armor: "喂嘆者面具", talisman: "-", spell: "-", skill: "拉滿弓(重回巔峰可用白金射擊)" },
-            { cat: "DLC 職業", id: 17, name: "龍饗女巫", stat: "感", weapon: "秘文劍、花岩錘、黃金樹聖印記、爪痕聖印記", shield: "-", armor: "女巫心臟", talisman: "-", spell: "騎士雷電槍、古龍雷擊、芙柔桑克斯的龍雷", skill: "-" },
-            { cat: "DLC 職業", id: 18, name: "托莉娜之劍", stat: "敏/智", weapon: "托莉娜暗劍、君王軍直劍(寒冷)、休里耶暗針", shield: "交錯樹塔盾", armor: "托莉娜花/巨盔、鱗片套", talisman: "-", spell: "-", skill: "準備架式" },
-            { cat: "DLC 職業", id: 19, name: "重力之咒", stat: "純智", weapon: "卡利亞權杖、隕石杖、黃金律法聖印記", shield: "-", armor: "魔法教授套、領主長袍", talisman: "-", spell: "碎星、艾斯提隕石、引力球、岩塊刀刃、岩石球", skill: "-" },
-            { cat: "DLC 職業", id: 20, name: "龍裔羅剎", stat: "純敏", weapon: "獵龍大刀、羅剎大刀、龍饗聖印記", shield: "-", armor: "羅刹套", talisman: "-", spell: "全龍饗", skill: "-" },
-            { cat: "DLC 職業", id: 21, name: "暗影之劍", stat: "智/信", weapon: "流紋系、活祭品斧", shield: "-", armor: "幽影地惡兵套", talisman: "-", spell: "-", skill: "自行搭配" },
-            { cat: "DLC 職業", id: 22, name: "卡利亞騎士長", stat: "智/敏", weapon: "卡利亞魔法劍", shield: "狼紋盾", armor: "卡利亞騎士頭、雙月身、腳、聚獸手", talisman: "-", spell: "魔法三輝劍、巨劍陣、雙月、魔力盾牌、卡利亞迅劍、卡利亞貫刺、亞杜拉月光劍", skill: "卡利亞式奉還" },
-            { cat: "DLC 職業", id: 23, name: "雙月騎士", stat: "智信力敏", weapon: "蕾拉娜的對劍、黃金律法聖印記", shield: "-", armor: "蕾拉娜套", talisman: "蕾拉娜的浮雕墜飾、雙首龜護符、龍徽大盾護符、亞歷山大的碎片", spell: "-", skill: "月與火的架式" },
-            { cat: "DLC 職業", id: 24, name: "寒霜武僧", stat: "敏/智", weapon: "落葉格鬥術", shield: "-", armor: "丹恩帽子、梅瑟莫士兵鎧甲、角戰士手、角戰士腳", talisman: "藍色舞孃護符、龍徽大盾護符、大山羊護符、亞歷山大的碎片", spell: "-", skill: "神獸凍霜踏地" },
-            { cat: "DLC 職業", id: 25, name: "流星掠奪者", stat: "力/感", weapon: "古鐵隕石大劍、活祭品斧", shield: "-", armor: "巨盔、黑騎士套", talisman: "亞歷山大的碎片、矛護符、雙手劍護符、卡利亞徽章", spell: "-", skill: "白光突擊" },
-            { cat: "DLC 職業", id: 26, name: "死騎士之首", stat: "信/力", weapon: "死騎士對斧、死騎士長柄斧", shield: "-", armor: "死騎士頭、身、手、異形龍腳", talisman: "米莉森的義手、腐敗翼劍徽章、亞歷山大的碎片、雙首龜護符", spell: "黃金樹立誓、火賜", skill: "瞬雷：對斧/長柄斧" },
-            { cat: "DLC 職業", id: 27, name: "泥盆亞毀滅者", stat: "力/信", weapon: "泥盆亞的槌、黃金樹聖印記", shield: "-", armor: "熔爐槌形頭盔、熔爐樹形鎧甲、熔爐臂甲、熔爐腿甲", talisman: "雙手劍護符、亞歷山大的碎片、大壺眾武護符、龍徽大盾護符", spell: "黃金樹立誓、火賜", skill: "泥盆亞的漩渦" },
-            { cat: "DLC 職業", id: 28, name: "暗黑聖騎士", stat: "純敏", weapon: "仕女劍 (戰灰: 岩石劍)", shield: "狼紋盾", armor: "孤牢騎士套", talisman: "米莉森的義手、腐敗翼劍徽章、龍徽大盾護符、大壺眾武護符", spell: "-", skill: "岩石劍、黃金樹立誓" },
-            { cat: "DLC 職業", id: 29, name: "騎士之劍", stat: "純敏", weapon: "反手劍", shield: "大龜殼", armor: "黑騎士套裝", talisman: "米莉森的義手、腐敗翼劍徽章、龍徽大盾護符、雙首龜護符", spell: "-", skill: "死角一擊" },
-            { cat: "DLC 職業", id: 30, name: "烈焰調香師", stat: "敏", weapon: "火花調香瓶、黃金律法聖印記", shield: "-", armor: "調香師套裝", talisman: "火對蠍、龍徽大盾護符、調香師護符、斧護符", spell: "火賜、黃金樹立誓", skill: "串聯火花、碎步" },
-            { cat: "DLC 職業", id: 31, name: "虛空騎士", stat: "純敏", weapon: "黑夜刀", shield: "黑夜盾", armor: "黑夜頭盔、黑夜鎧甲、黑騎士手套、黑騎士腿甲", talisman: "遠征勳章、亞歷山大的碎片、恩惠藍露滴護符、葛孚雷的肖像", spell: "-", skill: "永夜斬擊、黑夜復仇" },
-            { cat: "DLC 職業", id: 32, name: "血腥騎槍", stat: "力/感", weapon: "劍形長矛 (戰灰: 鮮血徵收)", shield: "-", armor: "蓋烏斯套裝", talisman: "亞歷山大的碎片、鮮血君王的歡愉、腐敗翼劍徽章、雙手劍護符", spell: "-", skill: "鮮血徵收" },
-            { cat: "DLC 職業", id: 33, name: "血腥獸爪", stat: "力敏", weapon: "獸爪、獻祭斧", shield: "-", armor: "角戰士頭盔、角戰士鎧甲、萊恩尼爾臂甲、角戰士腿甲", talisman: "雙頭龜護符、鮮血君王的歡愉、聖戰徽章、亞歷山大的碎片", spell: "-", skill: "野獸爪擊" },
-            { cat: "DLC 職業", id: 34, name: "龍神", stat: "純感", weapon: "龍饗印記、血怪叉", shield: "-", armor: "岩石心臟", talisman: "藍色舞孃護符、聖戰徽章、龍徽大盾護符、群聚信徒的立誓布", spell: "黃金樹立誓、火賜、艾格基斯的腐敗、腐敗吐息、龍咬", skill: "劍舞、誇耀咆哮" },
+            { cat: "DLC 職業", id: 13, name: "貫刺聖騎士", stat: "敏/信", weapon: "雷妲劍", shield: "-", armor: "雷姐身", talisman: "-", spell: "黃金樹立誓", skill: "-" },
+            { cat: "DLC 職業", id: 14, name: "風暴之刃", stat: "力敏", weapon: "大刀", shield: "-", armor: "神獸戰士套", talisman: "-", spell: "-", skill: "風暴刃" },
+            { cat: "DLC 職業", id: 15, name: "梅瑟莫之火", stat: "信/力", weapon: "火焰騎士大劍", shield: "-", armor: "梅瑟莫頭", talisman: "-", spell: "火焰蛇", skill: "火焰槍" },
+            { cat: "DLC 職業", id: 16, name: "風暴之箭", stat: "純敏", weapon: "安帕赫長弓", shield: "-", armor: "喂嘆者面具", talisman: "-", spell: "-", skill: "拉滿弓" },
+            { cat: "DLC 職業", id: 17, name: "龍饗女巫", stat: "感", weapon: "花岩錘", shield: "-", armor: "女巫心臟", talisman: "-", spell: "古龍雷擊", skill: "-" },
+            { cat: "DLC 職業", id: 18, name: "托莉娜之劍", stat: "敏/智", weapon: "托莉娜暗劍", shield: "交錯樹塔盾", armor: "托莉娜花", talisman: "-", spell: "-", skill: "準備架式" },
+            { cat: "DLC 職業", id: 19, name: "重力之咒", stat: "純智", weapon: "卡利亞權杖", shield: "-", armor: "魔法教授套", talisman: "-", spell: "艾斯提隕石", skill: "-" },
+            { cat: "DLC 職業", id: 20, name: "龍裔羅剎", stat: "純敏", weapon: "羅剎大刀", shield: "-", armor: "羅刹套", talisman: "-", spell: "全龍饗", skill: "-" },
+            { cat: "DLC 職業", id: 21, name: "暗影之劍", stat: "智/信", weapon: "流紋系", shield: "-", armor: "幽影地惡兵套", talisman: "-", spell: "-", skill: "自行搭配" },
+            { cat: "DLC 職業", id: 22, name: "卡利亞騎士長", stat: "智/敏", weapon: "卡利亞魔法劍", shield: "狼紋盾", armor: "雙月身", talisman: "-", spell: "雙月", skill: "卡利亞式奉還" },
+            { cat: "DLC 職業", id: 23, name: "雙月騎士", stat: "智信力敏", weapon: "蕾拉娜的對劍", shield: "-", armor: "蕾拉娜套", talisman: "蕾拉娜的浮雕墜飾", spell: "-", skill: "月與火的架式" },
+            { cat: "DLC 職業", id: 24, name: "寒霜武僧", stat: "敏/智", weapon: "落葉格鬥術", shield: "-", armor: "丹恩帽子", talisman: "大山羊護符", spell: "-", skill: "神獸凍霜踏地" },
+            { cat: "DLC 職業", id: 25, name: "流星掠奪者", stat: "力/感", weapon: "古鐵隕石大劍", shield: "-", armor: "黑騎士套", talisman: "雙手劍護符", spell: "-", skill: "白光突擊" },
+            { cat: "DLC 職業", id: 26, name: "死騎士之首", stat: "信/力", weapon: "死騎士對斧", shield: "-", armor: "死騎士套", talisman: "亞歷山大的碎片", spell: "火賜", skill: "瞬雷" },
+            { cat: "DLC 職業", id: 27, name: "泥盆亞毀滅者", stat: "力/信", weapon: "泥盆亞的槌", shield: "-", armor: "熔爐樹形鎧甲", talisman: "雙手劍護符", spell: "火賜", skill: "泥盆亞的漩渦" },
+            { cat: "DLC 職業", id: 28, name: "暗黑聖騎士", stat: "純敏", weapon: "仕女劍", shield: "狼紋盾", armor: "孤牢騎士套", talisman: "米莉森的義手", spell: "-", skill: "岩石劍" },
+            { cat: "DLC 職業", id: 29, name: "騎士之劍", stat: "純敏", weapon: "反手劍", shield: "大龜殼", armor: "黑騎士套裝", talisman: "腐敗翼劍徽章", spell: "-", skill: "死角一擊" },
+            { cat: "DLC 職業", id: 30, name: "烈焰調香師", stat: "敏", weapon: "火花調香瓶", shield: "-", armor: "調香師套裝", talisman: "火對蠍", spell: "黃金樹立誓", skill: "串聯火花" },
+            { cat: "DLC 職業", id: 31, name: "虛空騎士", stat: "純敏", weapon: "黑夜刀", shield: "黑夜盾", armor: "黑夜套", talisman: "遠征勳章", spell: "-", skill: "永夜斬擊" },
+            { cat: "DLC 職業", id: 32, name: "血腥騎槍", stat: "力/感", weapon: "劍形長矛", shield: "-", armor: "蓋烏斯套", talisman: "亞歷山大的碎片", spell: "-", skill: "鮮血徵收" },
+            { cat: "DLC 職業", id: 33, name: "血腥獸爪", stat: "力敏", weapon: "獸爪", shield: "-", armor: "角戰士套", talisman: "鮮血君王的歡愉", spell: "-", skill: "野獸爪擊" },
+            { cat: "DLC 職業", id: 34, name: "龍神", stat: "純感", weapon: "血怪叉", shield: "-", armor: "岩石心臟", talisman: "聖戰徽章", spell: "腐敗吐息", skill: "劍舞" },
             
             // 特殊職業
-            { cat: "特殊職業", id: 1, name: "人民的好朋友", stat: "純力", weapon: "騎兵長矛", shield: "逆鷹塔盾", armor: "騎士頭、格密爾騎士身(輕裝)、火焰主教臂甲、流浪騎士腳", talisman: "勾指偽裝鏡", spell: "-", skill: "突擊" },
-            { cat: "特殊職業", id: 2, name: "督戰聖女", stat: "純信", weapon: "秘文劍、黃金律法聖印記", shield: "-", armor: "黑夜女巫套、光芒頭冠", talisman: "-", spell: "黃金樹立誓、黃金樹恩惠、遠方之恢復、黃金樹庇佑系列、光環系列、彎弧系列、原理系列、黃金之怒", skill: "-" },
+            { cat: "特殊職業", id: 1, name: "人民的好朋友", stat: "純力", weapon: "騎兵長矛", shield: "逆鷹塔盾", armor: "騎士頭", talisman: "勾指偽裝鏡", spell: "-", skill: "突擊" },
+            { cat: "特殊職業", id: 2, name: "督戰聖女", stat: "純信", weapon: "秘文劍", shield: "-", armor: "黑夜女巫套", talisman: "-", spell: "黃金樹恩惠", skill: "-" },
         ];
 
         // Component: 卡片顯示
         const BuildCard = ({ build }) => {
-            const getSoftCapText = (stat) => {
-                if (!stat) return null;
-                const caps = [];
-                // 檢查包含的屬性
-                if (stat.includes("力") || stat.includes("純力")) caps.push("力:單55/雙40");
-                if (stat.includes("敏") || stat.includes("敏") || stat.includes("純敏")) caps.push("敏:50");
-                if (stat.includes("智") || stat.includes("純智")) caps.push("智:80");
-                if (stat.includes("信") || stat.includes("純信")) caps.push("信:60");
-                if (stat.includes("感") || stat.includes("純感")) caps.push("感:45");
-                
-                if (caps.length === 0) return null;
-                return caps.join(" | ");
-            };
-
             const softCapText = getSoftCapText(build.stat);
 
             return (
                 <div className="card-bg p-4 rounded-lg shadow-lg border border-gray-700 hover:border-yellow-600 transition duration-200">
                     <div className="flex justify-between items-start mb-3">
                         <div>
-                            <span className={`text-xs font-bold px-2 py-1 rounded ${build.cat === 'DLC 職業' ? 'bg-red-900 text-red-100' : 'bg-blue-900 text-blue-100'}`}>
+                            <span className={`text-xs font-bold px-2 py-1 rounded ${build.cat === 'DLC 職業' ? 'bg-red-900 text-red-100' : build.cat === '特殊職業' ? 'bg-purple-900 text-purple-100' : 'bg-blue-900 text-blue-100'}`}>
                                 {build.cat}
                             </span>
                             <h3 className="text-xl font-bold elden-gold mt-1">{build.id}. {build.name}</h3>
@@ -218,38 +216,37 @@
             const [activeTab, setActiveTab] = useState("search");
             const [searchTerm, setSearchTerm] = useState("");
             
-            // Team Builder States
             const [players, setPlayers] = useState([]);
             const [newPlayerName, setNewPlayerName] = useState("");
             const [selectedPlayers, setSelectedPlayers] = useState([]);
             const [teamResults, setTeamResults] = useState(null);
 
-            // Load players from localStorage on mount
             useEffect(() => {
                 const savedPlayers = localStorage.getItem("eldenPlayers");
-                if (savedPlayers) {
-                    setPlayers(JSON.parse(savedPlayers));
-                }
+                if (savedPlayers) setPlayers(JSON.parse(savedPlayers));
             }, []);
 
-            // Save players to localStorage whenever list changes
             useEffect(() => {
                 localStorage.setItem("eldenPlayers", JSON.stringify(players));
             }, [players]);
 
-            // Filter logic
-            const filteredBuilds = allBuilds.filter(b => {
+            const filteredBuilds = useMemo(() => {
                 const term = searchTerm.toLowerCase();
-                return (
+                return allBuilds.filter(b => 
                     b.name.toLowerCase().includes(term) ||
                     b.weapon.toLowerCase().includes(term) ||
                     b.stat?.toLowerCase().includes(term) ||
-                    b.talisman?.toLowerCase().includes(term) ||
                     b.skill?.toLowerCase().includes(term)
                 );
-            });
+            }, [searchTerm]);
 
-            // Player Management
+            // 分類索引（大綱用）
+            const categoryAnchors = [
+                { title: "本體職業", id: "base" },
+                { title: "DLC 職業", id: "dlc" },
+                { title: "特殊職業", id: "special" }
+            ];
+
             const addPlayer = () => {
                 if (newPlayerName.trim() && !players.includes(newPlayerName.trim())) {
                     setPlayers([...players, newPlayerName.trim()]);
@@ -263,232 +260,150 @@
             };
 
             const toggleSelection = (name) => {
-                if (selectedPlayers.includes(name)) {
-                    setSelectedPlayers(selectedPlayers.filter(p => p !== name));
-                } else {
-                    setSelectedPlayers([...selectedPlayers, name]);
-                }
+                if (selectedPlayers.includes(name)) setSelectedPlayers(selectedPlayers.filter(p => p !== name));
+                else setSelectedPlayers([...selectedPlayers, name]);
             };
 
-            // Team Split & Assign Logic
             const generateTeams = () => {
-                if (selectedPlayers.length < 1) {
-                    alert("請至少選擇一名玩家！");
-                    return;
-                }
-
-                // 1. Shuffle Players
+                if (selectedPlayers.length < 1) return;
                 let shuffledPlayers = [...selectedPlayers].sort(() => 0.5 - Math.random());
-                
-                // 2. Split into two teams
                 const mid = Math.ceil(shuffledPlayers.length / 2);
-                const teamA_Players = shuffledPlayers.slice(0, mid);
-                const teamB_Players = shuffledPlayers.slice(mid);
+                const teamA_P = shuffledPlayers.slice(0, mid);
+                const teamB_P = shuffledPlayers.slice(mid);
 
-                // 3. Assign random builds
-                // Shuffle build indices to ensure no duplicates if possible, or just pick random
                 let shuffledBuilds = [...allBuilds].sort(() => 0.5 - Math.random());
+                const assign = (list, start) => list.map((p, i) => ({
+                    player: p,
+                    build: shuffledBuilds[(start + i) % shuffledBuilds.length]
+                }));
 
-                const assignBuilds = (playerList, startIndex) => {
-                    return playerList.map((player, idx) => ({
-                        player: player,
-                        build: shuffledBuilds[(startIndex + idx) % shuffledBuilds.length]
-                    }));
-                };
-
-                const teamA_Result = assignBuilds(teamA_Players, 0);
-                const teamB_Result = assignBuilds(teamB_Players, teamA_Players.length);
-
-                setTeamResults({
-                    teamA: teamA_Result,
-                    teamB: teamB_Result
-                });
+                setTeamResults({ teamA: assign(teamA_P, 0), teamB: assign(teamB_P, teamA_P.length) });
             };
 
             return (
-                <div className="container mx-auto p-4 max-w-6xl min-h-screen flex flex-col">
+                <div className="container mx-auto p-4 max-w-7xl min-h-screen flex flex-col">
                     <header className="mb-6 text-center border-b border-gray-700 pb-4">
-                        <h1 className="text-3xl md:text-4xl font-bold elden-gold tracking-wider mb-2">
-                            艾爾登法環
-                        </h1>
+                        <h1 className="text-3xl md:text-4xl font-bold elden-gold tracking-wider mb-2">艾爾登法環</h1>
                         <h2 className="text-xl text-gray-400">流派查詢 & 競技分隊器</h2>
                     </header>
 
-                    {/* Navigation Tabs */}
                     <div className="flex justify-center mb-6 space-x-4">
-                        <button 
-                            onClick={() => setActiveTab("search")}
-                            className={`px-6 py-2 rounded font-bold transition ${activeTab === "search" ? "bg-yellow-700 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
-                        >
-                            流派查詢
-                        </button>
-                        <button 
-                            onClick={() => setActiveTab("team")}
-                            className={`px-6 py-2 rounded font-bold transition ${activeTab === "team" ? "bg-yellow-700 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
-                        >
-                            分隊抽籤
-                        </button>
+                        <button onClick={() => setActiveTab("search")} className={`px-6 py-2 rounded font-bold transition ${activeTab === "search" ? "bg-yellow-700 text-white" : "bg-gray-800 text-gray-400"}`}>流派查詢</button>
+                        <button onClick={() => setActiveTab("team")} className={`px-6 py-2 rounded font-bold transition ${activeTab === "team" ? "bg-yellow-700 text-white" : "bg-gray-800 text-gray-400"}`}>分隊抽籤</button>
                     </div>
 
-                    {/* Content Area */}
                     <div className="flex-grow">
                         {activeTab === "search" && (
-                            <div>
-                                <div className="mb-4 flex flex-col items-center space-y-4">
-                                    <input 
-                                        type="text" 
-                                        placeholder="搜尋流派名稱、武器、護符或配點..." 
-                                        className="w-full md:w-1/2 p-3 rounded bg-gray-800 border border-gray-600 focus:outline-none focus:border-yellow-600 text-white placeholder-gray-500"
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
-                                    
-                                    {/* 三圍軟上限資訊區塊 */}
-                                    <div className="w-full md:w-3/4 p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-sm text-gray-300 grid grid-cols-1 md:grid-cols-3 gap-2 text-center shadow-sm">
-                                        <div className="flex items-center justify-center space-x-2">
-                                            <span className="text-red-400 font-bold">生命 (Vigor):</span>
-                                            <span>40(軟一) / 60(軟二)</span>
-                                        </div>
-                                        <div className="flex items-center justify-center space-x-2">
-                                            <span className="text-blue-400 font-bold">集中 (Mind):</span>
-                                            <span>55</span>
-                                        </div>
-                                        <div className="flex items-center justify-center space-x-2">
-                                            <span className="text-green-400 font-bold">耐力 (Endurance):</span>
-                                            <span>50</span>
+                            <div className="flex flex-col md:flex-row gap-8">
+                                {/* 左側大綱 Sidebar */}
+                                <aside className="hidden md:block w-48 sticky top-4 self-start bg-gray-900/50 p-4 rounded border border-gray-800">
+                                    <h4 className="text-sm font-bold text-gray-500 mb-4 tracking-widest uppercase">大綱導覽</h4>
+                                    <nav className="space-y-4">
+                                        {categoryAnchors.map(anchor => (
+                                            <a key={anchor.id} href={`#${anchor.id}`} className="block text-gray-400 hover:text-yellow-600 transition font-medium">
+                                                {anchor.title}
+                                            </a>
+                                        ))}
+                                    </nav>
+                                </aside>
+
+                                {/* 主要內容區 */}
+                                <div className="flex-1">
+                                    <div className="mb-8 flex flex-col items-center space-y-4">
+                                        <input type="text" placeholder="搜尋流派、武器或配點..." className="w-full md:w-2/3 p-3 rounded bg-gray-800 border border-gray-600 focus:border-yellow-600 text-white" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                                        <div className="w-full p-4 bg-gray-800/50 rounded-lg border border-gray-700 text-xs text-gray-300 grid grid-cols-1 md:grid-cols-3 gap-2 text-center">
+                                            <div><span className="text-red-400 font-bold">生命:</span> 40 / 60</div>
+                                            <div><span className="text-blue-400 font-bold">集中:</span> 55</div>
+                                            <div><span className="text-green-400 font-bold">耐力:</span> 50</div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {filteredBuilds.map((build, index) => (
-                                        <BuildCard key={`${build.cat}-${build.id}`} build={build} />
-                                    ))}
-                                    {filteredBuilds.length === 0 && (
-                                        <p className="text-center text-gray-500 col-span-full py-10">找不到符合的流派，請嘗試其他關鍵字。</p>
-                                    )}
+                                    <div className="space-y-12">
+                                        {categoryAnchors.map(cat => {
+                                            const builds = filteredBuilds.filter(b => b.cat === cat.title);
+                                            if (builds.length === 0) return null;
+                                            return (
+                                                <section key={cat.id} id={cat.id} className="scroll-mt-24">
+                                                    <h2 className="text-2xl font-bold elden-gold mb-6 border-l-4 border-yellow-700 pl-4">{cat.title}</h2>
+                                                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+                                                        {builds.map(b => <BuildCard key={`${b.cat}-${b.id}`} build={b} />)}
+                                                    </div>
+                                                </section>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                         )}
 
                         {activeTab === "team" && (
                             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                                {/* Player Management Section */}
                                 <div className="lg:col-span-4 bg-gray-900 p-6 rounded-lg border border-gray-700">
                                     <h3 className="text-xl font-bold mb-4 elden-gold">1. 玩家名單</h3>
-                                    
                                     <div className="flex mb-4">
-                                        <input 
-                                            type="text" 
-                                            placeholder="輸入玩家名稱" 
-                                            className="flex-grow p-2 rounded-l bg-gray-800 border border-gray-600 text-white focus:outline-none"
-                                            value={newPlayerName}
-                                            onChange={(e) => setNewPlayerName(e.target.value)}
-                                            onKeyPress={(e) => e.key === 'Enter' && addPlayer()}
-                                        />
-                                        <button 
-                                            onClick={addPlayer}
-                                            className="bg-green-700 hover:bg-green-600 text-white px-4 py-2 rounded-r"
-                                        >
-                                            新增
-                                        </button>
+                                        <input type="text" placeholder="輸入玩家" className="flex-grow p-2 rounded-l bg-gray-800 border border-gray-600 text-white" value={newPlayerName} onChange={(e) => setNewPlayerName(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && addPlayer()} />
+                                        <button onClick={addPlayer} className="bg-green-700 px-4 py-2 rounded-r">新增</button>
                                     </div>
-
-                                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                                        {players.length === 0 ? <p className="text-gray-500 text-sm">暫無玩家，請先新增。</p> : null}
-                                        {players.map(player => (
-                                            <div key={player} className="flex items-center justify-between bg-gray-800 p-2 rounded hover:bg-gray-750">
+                                    <div className="space-y-2 max-h-96 overflow-y-auto mb-4">
+                                        {players.map(p => (
+                                            <div key={p} className="flex items-center justify-between bg-gray-800 p-2 rounded">
                                                 <label className="flex items-center space-x-3 cursor-pointer flex-grow">
-                                                    <input 
-                                                        type="checkbox" 
-                                                        checked={selectedPlayers.includes(player)}
-                                                        onChange={() => toggleSelection(player)}
-                                                        className="form-checkbox h-5 w-5 text-yellow-600 rounded focus:ring-0"
-                                                    />
-                                                    <span className={selectedPlayers.includes(player) ? "text-white font-bold" : "text-gray-400"}>{player}</span>
+                                                    <input type="checkbox" checked={selectedPlayers.includes(p)} onChange={() => toggleSelection(p)} className="h-4 w-4" />
+                                                    <span className={selectedPlayers.includes(p) ? "text-white font-bold" : "text-gray-400"}>{p}</span>
                                                 </label>
-                                                <button 
-                                                    onClick={() => removePlayer(player)}
-                                                    className="text-red-500 hover:text-red-400 text-sm px-2"
-                                                >
-                                                    刪除
-                                                </button>
+                                                <button onClick={() => removePlayer(p)} className="text-red-500 text-sm">刪除</button>
                                             </div>
                                         ))}
                                     </div>
-
-                                    <div className="mt-4 pt-4 border-t border-gray-700">
-                                        <p className="text-sm text-gray-400 mb-2">已選擇參加: {selectedPlayers.length} 人</p>
-                                        <button 
-                                            onClick={generateTeams}
-                                            className="w-full bg-yellow-700 hover:bg-yellow-600 text-white font-bold py-3 rounded shadow-lg transform active:scale-95 transition"
-                                        >
-                                            ⚔️ 分隊並抽取流派 ⚔️
-                                        </button>
-                                    </div>
+                                    <button onClick={generateTeams} className="w-full bg-yellow-700 font-bold py-3 rounded active:scale-95 transition">⚔️ 分隊並抽取流派 ⚔️</button>
                                 </div>
 
-                                {/* Results Section */}
                                 <div className="lg:col-span-8">
                                     <h3 className="text-xl font-bold mb-4 elden-gold">2. 分組結果</h3>
-                                    
                                     {!teamResults ? (
-                                        <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-700 rounded-lg text-gray-500">
-                                            請選擇玩家並點擊分隊按鈕
-                                        </div>
+                                        <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-700 rounded-lg text-gray-500">請選擇玩家並分隊</div>
                                     ) : (
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            {/* Team A */}
-                                            <div className="bg-red-900/20 border border-red-900/50 p-4 rounded-lg">
-                                                <h4 className="text-2xl font-bold text-red-500 mb-4 text-center border-b border-red-900/50 pb-2">RED TEAM</h4>
-                                                <div className="space-y-4">
-                                                    {teamResults.teamA.map((item, idx) => (
-                                                        <div key={idx} className="bg-gray-800 p-3 rounded shadow mb-4">
-                                                            <div className="text-lg font-bold text-white mb-2 border-b border-gray-600 pb-1">{item.player}</div>
-                                                            <div className="text-sm text-gray-300 space-y-1">
-                                                                 <div className="font-bold text-yellow-500 text-base">{item.build.id}. {item.build.name} <span className="text-xs text-gray-400 font-normal">({item.build.stat || "未指定"})</span></div>
-                                                                 <div><span className="text-yellow-600 font-semibold">武器:</span> {item.build.weapon}</div>
-                                                                 {item.build.shield !== '-' && <div><span className="text-yellow-600 font-semibold">盾牌:</span> {item.build.shield}</div>}
-                                                                 <div><span className="text-yellow-600 font-semibold">裝備:</span> {item.build.armor}</div>
-                                                                 <div><span className="text-yellow-600 font-semibold">護符:</span> {item.build.talisman}</div>
-                                                                 {item.build.spell !== '-' && <div><span className="text-blue-400 font-semibold">法術/禱告:</span> {item.build.spell}</div>}
-                                                                 {item.build.skill !== '-' && <div><span className="text-red-400 font-semibold">戰技:</span> {item.build.skill}</div>}
-                                                            </div>
+                                            {["A", "B"].map(team => {
+                                                const data = team === "A" ? teamResults.teamA : teamResults.teamB;
+                                                const teamColor = team === "A" ? "red" : "blue";
+                                                return (
+                                                    <div key={team} className={`bg-${teamColor}-900/10 border border-${teamColor}-900/50 p-4 rounded-lg`}>
+                                                        <h4 className={`text-2xl font-bold text-${teamColor}-500 mb-4 text-center border-b border-${teamColor}-900/50 pb-2`}>TEAM {team === "A" ? "RED" : "BLUE"}</h4>
+                                                        <div className="space-y-4">
+                                                            {data.map((item, idx) => {
+                                                                const sc = getSoftCapText(item.build.stat);
+                                                                return (
+                                                                    <div key={idx} className="bg-gray-800 p-3 rounded shadow">
+                                                                        <div className="text-lg font-bold text-white mb-1 border-b border-gray-600 pb-1">{item.player}</div>
+                                                                        <div className="text-xs text-gray-300 space-y-1">
+                                                                            <div className="font-bold text-yellow-500 text-sm">
+                                                                                {item.build.id}. {item.build.name} 
+                                                                                <span className="text-[10px] text-gray-400 font-normal ml-2">
+                                                                                    ({item.build.stat || "-"}) {sc ? `[${sc}]` : ""}
+                                                                                </span>
+                                                                            </div>
+                                                                            <div><span className="text-yellow-600 font-semibold">武器:</span> {item.build.weapon}</div>
+                                                                            {item.build.shield !== '-' && <div><span className="text-yellow-600 font-semibold">盾牌:</span> {item.build.shield}</div>}
+                                                                            <div><span className="text-yellow-600 font-semibold">裝備:</span> {item.build.armor}</div>
+                                                                            <div><span className="text-yellow-600 font-semibold">護符:</span> {item.build.talisman}</div>
+                                                                            {item.build.spell !== '-' && <div><span className="text-blue-400 font-semibold">法術:</span> {item.build.spell}</div>}
+                                                                            {item.build.skill !== '-' && <div><span className="text-red-400 font-semibold">戰技:</span> {item.build.skill}</div>}
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
                                                         </div>
-                                                    ))}
-                                                </div>
-                                            </div>
-
-                                            {/* Team B */}
-                                            <div className="bg-blue-900/20 border border-blue-900/50 p-4 rounded-lg">
-                                                <h4 className="text-2xl font-bold text-blue-500 mb-4 text-center border-b border-blue-900/50 pb-2">BLUE TEAM</h4>
-                                                <div className="space-y-4">
-                                                    {teamResults.teamB.map((item, idx) => (
-                                                        <div key={idx} className="bg-gray-800 p-3 rounded shadow mb-4">
-                                                            <div className="text-lg font-bold text-white mb-2 border-b border-gray-600 pb-1">{item.player}</div>
-                                                            <div className="text-sm text-gray-300 space-y-1">
-                                                                 <div className="font-bold text-yellow-500 text-base">{item.build.id}. {item.build.name} <span className="text-xs text-gray-400 font-normal">({item.build.stat || "未指定"})</span></div>
-                                                                 <div><span className="text-yellow-600 font-semibold">武器:</span> {item.build.weapon}</div>
-                                                                 {item.build.shield !== '-' && <div><span className="text-yellow-600 font-semibold">盾牌:</span> {item.build.shield}</div>}
-                                                                 <div><span className="text-yellow-600 font-semibold">裝備:</span> {item.build.armor}</div>
-                                                                 <div><span className="text-yellow-600 font-semibold">護符:</span> {item.build.talisman}</div>
-                                                                 {item.build.spell !== '-' && <div><span className="text-blue-400 font-semibold">法術/禱告:</span> {item.build.spell}</div>}
-                                                                 {item.build.skill !== '-' && <div><span className="text-red-400 font-semibold">戰技:</span> {item.build.skill}</div>}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            </div>
+                                                    </div>
+                                                );
+                                            })}
                                         </div>
                                     )}
                                 </div>
                             </div>
                         )}
                     </div>
-                    
-                    <footer className="mt-12 py-6 text-center text-gray-600 text-sm border-t border-gray-800">
-                        Elden Ring Fan Tool. Data based on provided user list.
-                    </footer>
+                    <footer className="mt-12 py-6 text-center text-gray-600 text-sm border-t border-gray-800">Elden Ring Team Builder Tool.</footer>
                 </div>
             );
         };
